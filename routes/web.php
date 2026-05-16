@@ -29,4 +29,12 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
+Route::middleware(['auth'])->group(function () {
+    Route::post('/documents/{document}/share', [App\Http\Controllers\ShareDocumentController::class, 'store'])
+        ->name('documents.share');
+    Route::delete('/documents/{document}/share/{user}', [App\Http\Controllers\ShareDocumentController::class, 'destroy'])
+        ->name('documents.unshare');
+});
+
 require __DIR__.'/auth.php';
+// Share Document Routes

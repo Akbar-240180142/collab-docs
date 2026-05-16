@@ -45,8 +45,11 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
-    }public function documents()
+    }
+
+    public function documents()
 {
-    return $this->hasMany(Document::class);
+    return $this->belongsToMany(Document::class)->withPivot('role');
 }
+
 }

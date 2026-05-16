@@ -9,13 +9,23 @@ use App\Events\DocumentUpdated;
 
 class DocumentController extends Controller
 {
-    public function index()
-    {
-        $documents = auth()->user()->documents()->latest()->get();
-        return Inertia::render('Documents/Index', [
-            'documents' => $documents
-        ]);
-    }
+ public function index()
+{
+    // Ambil dokumen yang:
+    // 1. Dimiliki user ini, ATAU
+    // 2. Di-share ke user ini (via pivot table)
+    
+    $documents = Document::where('user_id', auth()->id())
+        ->orWhereHas('users', function($query) {
+            $query->where('user_id', auth()->id());
+        })
+        ->latest()
+        ->get();
+        
+    return Inertia::render('Documents/Index', [
+        'documents' => $documents
+    ]);
+}
 
     public function create()
     {
@@ -25,24 +35,27 @@ class DocumentController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'title' => 'required|string|max:255'
-        ]);
+    'title' => 'required|string|max:255',
+    'content' => 'nullable|string',
+]);
 
-        $document = auth()->user()->documents()->create([
-            'title' => $request->title,
-            'content' => '<p>Mulai mengetik di sini...</p>'
-        ]);
-
+    $document = Document::create([
+    'title' => $request->title,
+    'content' => $request->content ?? '',
+    'user_id' => auth()->id(),
+]);
         return redirect()->route('documents.show', $document);
     }
-
-    public function show(Document $document)
+public function show(Document $document)
 {
-    // COMMENT OUT atau HAPUS baris ini:
-    // if ($document->user_id !== auth()->id()) {
-    //     abort(403);
-    // }
+    // Cek apakah user punya akses via pivot table
+    $access = $document->users()->where('user_id', auth()->id())->first();
     
+    // Kalau bukan owner dan tidak ada di pivot table, tolak
+    if ($document->user_id !== auth()->id() && !$access) {
+        abort(403, 'You do not have permission to view this document.');
+    }
+
     return Inertia::render('Documents/Show', [
         'document' => $document,
         'userName' => auth()->user()->name,
@@ -52,15 +65,21 @@ class DocumentController extends Controller
 
 public function update(Request $request, Document $document)
 {
+    \Log::info('=== UPDATE DIPANGGIL ===');
+    
+    $access = $document->users()->where('user_id', auth()->id())->first();
+    
+    if ($document->user_id !== auth()->id() && (!$access || $access->pivot->role === 'viewer')) {
+        abort(403, 'You do not have permission to edit this document.');
+    }
+
     $document->update([
         'content' => $request->content,
         'last_edited_at' => now(),
     ]);
 
-    // Debug log
-    \Log::info('Broadcasting update for document: ' . $document->id);
-
-    broadcast(new DocumentUpdated(
+    // Broadcast event
+    broadcast(new \App\Events\DocumentUpdated(
         $document->id,
         $request->content,
         auth()->id(),
@@ -69,4 +88,4 @@ public function update(Request $request, Document $document)
 
     return back();
 }
-}
+}  // ← HANYA INI SATU-SATUNYA PENUTUP METHOD
