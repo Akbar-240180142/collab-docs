@@ -11,17 +11,19 @@ class DocumentController extends Controller
 {
  public function index()
 {
-    // Ambil dokumen yang:
-    // 1. Dimiliki user ini, ATAU
-    // 2. Di-share ke user ini (via pivot table)
-    
-    $documents = Document::where('user_id', auth()->id())
-        ->orWhereHas('users', function($query) {
-            $query->where('user_id', auth()->id());
+    $userId = auth()->id();
+
+    // Logic Baru: 
+    // 1. Ambil dokumen yang user_id-nya = ID user login (Dokumen sendiri)
+    // 2. ATAU (orWhereHas) ambil dokumen yang ada relasi 'sharedUsers' untuk user login
+    $documents = Document::where('user_id', $userId)
+        ->orWhereHas('sharedUsers', function ($query) use ($userId) {
+            $query->where('user_id', $userId);
         })
+        ->with('user') // Optional: memuat info pemilik dokumen
         ->latest()
         ->get();
-        
+
     return Inertia::render('Documents/Index', [
         'documents' => $documents
     ]);
@@ -48,44 +50,53 @@ class DocumentController extends Controller
     }
 public function show(Document $document)
 {
-    // Cek apakah user punya akses via pivot table
-    $access = $document->users()->where('user_id', auth()->id())->first();
-    
-    // Kalau bukan owner dan tidak ada di pivot table, tolak
-    if ($document->user_id !== auth()->id() && !$access) {
-        abort(403, 'You do not have permission to view this document.');
+    // Cek apakah user ini pemilik dokumen ATAU punya akses share
+    if ($document->user_id !== auth()->id()) {
+        $isShared = $document->sharedUsers()
+            ->where('user_id', auth()->id())
+            ->exists();
+            
+        if (!$isShared) {
+            abort(403, 'Unauthorized action.');
+        }
     }
-
+    
     return Inertia::render('Documents/Show', [
         'document' => $document,
         'userName' => auth()->user()->name,
-        'userColor' => '#' . substr(md5(auth()->id()), 0, 6),
+        'userColor' => null
     ]);
 }
 
 public function update(Request $request, Document $document)
 {
-    \Log::info('=== UPDATE DIPANGGIL ===');
-    
-    $access = $document->users()->where('user_id', auth()->id())->first();
-    
-    if ($document->user_id !== auth()->id() && (!$access || $access->pivot->role === 'viewer')) {
-        abort(403, 'You do not have permission to edit this document.');
-    }
-
-    $document->update([
-        'content' => $request->content,
-        'last_edited_at' => now(),
+    $request->validate([
+        'content' => 'required|string'
     ]);
 
-    // Broadcast event
-    broadcast(new \App\Events\DocumentUpdated(
-        $document->id,
-        $request->content,
-        auth()->id(),
-        auth()->user()->name
-    ));
+    // Cek akses
+    if ($document->user_id !== auth()->id()) {
+        $access = $document->sharedUsers()
+            ->where('user_id', auth()->id())
+            ->first();
+            
+        if (!$access || $access->role === 'viewer') {
+            abort(403, 'You do not have permission to edit this document.');
+        }
+    }
 
-    return back();
+    // Update dokumen
+    $document->update([
+        'content' => $request->content,
+        'last_edited_at' => now()
+    ]);
+
+    // ✅ PENTING: Broadcast ke semua user di channel ini
+    event(new \App\Events\DocumentUpdated($document->id, $request->content));
+
+    return response()->json([
+        'message' => 'Document updated successfully',
+        'content' => $document->content
+    ]);
 }
 }  // ← HANYA INI SATU-SATUNYA PENUTUP METHOD

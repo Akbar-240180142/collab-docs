@@ -5,7 +5,13 @@ use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\ExportController;
 
+// Export routes
+Route::get('/documents/{document}/export/pdf', [ExportController::class, 'pdf'])
+    ->middleware(['auth'])
+    ->name('documents.export.pdf');
+    
 Route::middleware(['auth'])->group(function () {
     Route::resource('documents', DocumentController::class);
 });
@@ -35,6 +41,12 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/documents/{document}/share/{user}', [App\Http\Controllers\ShareDocumentController::class, 'destroy'])
         ->name('documents.unshare');
 });
-
+// Route untuk Share Document (Menggunakan Session Auth)
+Route::middleware(['auth'])->prefix('api')->group(function () {
+    Route::get('/documents/{document}/users', [\App\Http\Controllers\ShareDocumentController::class, 'index']);
+    Route::post('/documents/{document}/users', [\App\Http\Controllers\ShareDocumentController::class, 'store']);
+    Route::patch('/documents/{document}/users/{documentUser}', [\App\Http\Controllers\ShareDocumentController::class, 'update']);
+    Route::delete('/documents/{document}/users/{documentUser}', [\App\Http\Controllers\ShareDocumentController::class, 'destroy']);
+});
 require __DIR__.'/auth.php';
 // Share Document Routes

@@ -2,28 +2,35 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Document extends Model
 {
     use HasFactory;
 
-    // INI WAJIB ADA AGAR BISA MENYIMPAN DATA DARI CONTROLLER
     protected $fillable = [
+        'user_id',
         'title',
         'content',
-        'user_id',
-        'last_edited_at'
+        'last_edited_at',
     ];
 
-    // Relasi ke User
-    public function user()
+    protected $casts = [
+        'last_edited_at' => 'datetime',
+    ];
+
+    // Relasi ke User (Pemilik Dokumen)
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
-    public function users()
-{
-    return $this->belongsToMany(User::class)->withPivot('role');
-}
+
+    // ✅ TAMBAHKAN FUNGSI INI (Relasi ke tabel document_users)
+    public function sharedUsers(): HasMany
+    {
+        return $this->hasMany(DocumentUser::class);
+    }
 }

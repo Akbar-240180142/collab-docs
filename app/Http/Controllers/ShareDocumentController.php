@@ -3,52 +3,78 @@
 namespace App\Http\Controllers;
 
 use App\Models\Document;
+use App\Models\DocumentUser;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Gate;
 
 class ShareDocumentController extends Controller
 {
-    public function store(Request $request, Document $document)
-    {
-        // Hanya owner yang bisa share
-        if ($document->user_id !== auth()->id()) {
-            abort(403);
-        }
-
-        $validator = Validator::make($request->all(), [
-            'email' => 'required|email|exists:users,email',
-            'role' => 'required|in:editor,viewer',
-        ]);
-
-        if ($validator->fails()) {
-            return back()->withErrors($validator);
-        }
-
+    // Dapatkan semua user yang punya akses ke dokumen ini
+public function index(Document $document)
+{
+    // Gate::authorize('view', $document);  <-- KASI SLASH DI DEPANNYA
+    
+    $sharedUsers = $document->sharedUsers()->with('user')->get();
+    return response()->json($sharedUsers);
+}
+    
+    // Tambah user ke dokumen
+   public function store(Request $request, Document $document)
+{
+    // Gate::authorize('view', $document);  <-- KASI SLASH DI DEPANNYA
+    
+    $request->validate([
+        'email' => 'required|email|exists:users,email',
+        'role' => 'required|in:viewer,editor'
+    ]);
+    
+    // ... sisa kode tetap sama ...
+        
         $user = User::where('email', $request->email)->first();
-
-        // Jangan share ke diri sendiri
-        if ($user->id === auth()->id()) {
-            return back()->withErrors(['email' => 'Cannot share to yourself']);
+        
+        // Cek apakah user sudah ada
+        $existing = DocumentUser::where('document_id', $document->id)
+            ->where('user_id', $user->id)
+            ->first();
+        
+        if ($existing) {
+            return response()->json(['message' => 'User already has access'], 422);
         }
-
-        // Attach user ke document dengan role
-        $document->users()->syncWithoutDetaching([
-            $user->id => ['role' => $request->role]
+        
+        // Tambah user
+        DocumentUser::create([
+            'document_id' => $document->id,
+            'user_id' => $user->id,
+            'role' => $request->role
         ]);
-
-        return back()->with('success', "Document shared with {$user->name} as {$request->role}");
+        
+        return response()->json(['message' => 'User added successfully']);
     }
-
-    public function destroy(Document $document, User $user)
+    
+    // Update role user
+    public function update(Request $request, Document $document, $documentUserId)
     {
-        // Hanya owner yang bisa revoke access
-        if ($document->user_id !== auth()->id()) {
-            abort(403);
-        }
-
-        $document->users()->detach($user->id);
-
-        return back()->with('success', "Access revoked for {$user->name}");
-    } 
+        Gate::authorize('view', $document);
+        
+        $request->validate([
+            'role' => 'required|in:viewer,editor'
+        ]);
+        
+        $documentUser = DocumentUser::findOrFail($documentUserId);
+        $documentUser->update(['role' => $request->role]);
+        
+        return response()->json(['message' => 'Role updated successfully']);
+    }
+    
+    // Hapus akses user
+    public function destroy(Document $document, $documentUserId)
+    {
+        Gate::authorize('view', $document);
+        
+        $documentUser = DocumentUser::findOrFail($documentUserId);
+        $documentUser->delete();
+        
+        return response()->json(['message' => 'Access removed successfully']);
+    }
 }
