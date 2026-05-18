@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\ExportController;
+use App\Http\Controllers\ShareDocumentController;
 
 // Export routes
 Route::get('/documents/{document}/export/pdf', [ExportController::class, 'pdf'])
@@ -35,18 +36,22 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-Route::middleware(['auth'])->group(function () {
-    Route::post('/documents/{document}/share', [App\Http\Controllers\ShareDocumentController::class, 'store'])
-        ->name('documents.share');
-    Route::delete('/documents/{document}/share/{user}', [App\Http\Controllers\ShareDocumentController::class, 'destroy'])
-        ->name('documents.unshare');
-});
-// Route untuk Share Document (Menggunakan Session Auth)
+// ✅ SHARE & VERSION HISTORY ROUTES
 Route::middleware(['auth'])->prefix('api')->group(function () {
-    Route::get('/documents/{document}/users', [\App\Http\Controllers\ShareDocumentController::class, 'index']);
-    Route::post('/documents/{document}/users', [\App\Http\Controllers\ShareDocumentController::class, 'store']);
-    Route::patch('/documents/{document}/users/{documentUser}', [\App\Http\Controllers\ShareDocumentController::class, 'update']);
-    Route::delete('/documents/{document}/users/{documentUser}', [\App\Http\Controllers\ShareDocumentController::class, 'destroy']);
+    // Share routes
+    Route::get('/documents/{document}/users', [ShareDocumentController::class, 'index']);
+    Route::post('/documents/{document}/users', [ShareDocumentController::class, 'store']);
+    Route::patch('/documents/{document}/users/{documentUser}', [ShareDocumentController::class, 'update']);
+    Route::delete('/documents/{document}/users/{documentUser}', [ShareDocumentController::class, 'destroy']);
+    
+    // ✅ VERSION HISTORY ROUTES (LENGKAP!)
+    Route::get('/documents/{document}/versions', [DocumentController::class, 'versions']);
+    Route::get('/documents/{document}/versions/{version}', [DocumentController::class, 'getVersion']); // ✅ BARU!
+    Route::post('/documents/{document}/versions', [DocumentController::class, 'saveVersion']);
+    Route::post('/documents/{document}/versions/{version}/restore', [DocumentController::class, 'restoreVersion']);
 });
+
+// Typing indicator
+Route::middleware(['auth'])->patch('/documents/{document}/typing', [DocumentController::class, 'typing']);
+
 require __DIR__.'/auth.php';
-// Share Document Routes

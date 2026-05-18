@@ -33,4 +33,9 @@ class Document extends Model
     {
         return $this->hasMany(DocumentUser::class);
     }
+    // Tambahkan di dalam class Document
+public function versions()
+{
+    return $this->hasMany(DocumentVersion::class)->latest();
+}
 }

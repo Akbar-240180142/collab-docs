@@ -13,13 +13,11 @@ class UserTyping implements ShouldBroadcast
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public $documentId;
-    public $userId;
     public $userName;
 
-    public function __construct($documentId, $userId, $userName)
+    public function __construct($documentId, $userName)
     {
         $this->documentId = $documentId;
-        $this->userId = $userId;
         $this->userName = $userName;
     }
 
