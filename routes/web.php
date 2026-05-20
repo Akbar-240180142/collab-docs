@@ -8,7 +8,6 @@ use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\ShareDocumentController;
 
-// Export routes
 Route::get('/documents/{document}/export/pdf', [ExportController::class, 'pdf'])
     ->middleware(['auth'])
     ->name('documents.export.pdf');
@@ -36,22 +35,20 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-// ✅ SHARE & VERSION HISTORY ROUTES
 Route::middleware(['auth'])->prefix('api')->group(function () {
-    // Share routes
     Route::get('/documents/{document}/users', [ShareDocumentController::class, 'index']);
     Route::post('/documents/{document}/users', [ShareDocumentController::class, 'store']);
     Route::patch('/documents/{document}/users/{documentUser}', [ShareDocumentController::class, 'update']);
     Route::delete('/documents/{document}/users/{documentUser}', [ShareDocumentController::class, 'destroy']);
     
-    // ✅ VERSION HISTORY ROUTES (LENGKAP!)
     Route::get('/documents/{document}/versions', [DocumentController::class, 'versions']);
-    Route::get('/documents/{document}/versions/{version}', [DocumentController::class, 'getVersion']); // ✅ BARU!
+    Route::get('/documents/{document}/versions/{version}', [DocumentController::class, 'getVersion']);
     Route::post('/documents/{document}/versions', [DocumentController::class, 'saveVersion']);
     Route::post('/documents/{document}/versions/{version}/restore', [DocumentController::class, 'restoreVersion']);
 });
 
-// Typing indicator
+// ✅ LIVE CURSOR ROUTE
+Route::middleware(['auth'])->patch('/documents/{document}/cursor', [DocumentController::class, 'cursor']);
 Route::middleware(['auth'])->patch('/documents/{document}/typing', [DocumentController::class, 'typing']);
 
 require __DIR__.'/auth.php';
